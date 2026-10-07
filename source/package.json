@@ -1,0 +1,42 @@
+{
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "tailwindcss": "4.2.1",
+    "@vitejs/plugin-react": "6.0.2",
+    "@types/react-dom": "19.2.3",
+    "tw-animate-css": "1.4.0",
+    "@cloudflare/workers-types": "4.20260515.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "wrangler": "4.92.0",
+    "typescript": "5.9.3",
+    "vite": "8.0.13",
+    "@types/node": "22.19.19"
+  },
+  "name": "signal-lost",
+  "scripts": {
+    "deploy": "pnpm build && wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "test": "node --experimental-strip-types tests/game.test.mjs && node tests/worker.test.mjs",
+    "start": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build && wrangler deploy --dry-run --outdir dist/server",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "lucide-react": "1.31.0",
+    "react": "19.2.6",
+    "class-variance-authority": "0.7.1",
+    "tailwind-merge": "3.6.0",
+    "radix-ui": "1.6.7",
+    "react-dom": "19.2.6"
+  },
+  "version": "2.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0"
+}

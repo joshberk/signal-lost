@@ -1,0 +1,8 @@
+handoff/
+source/node_modules/
+source/dist/
+source/.wrangler/
+source/*.tsbuildinfo
+source/.dev.vars*
+source/.env*
+qa-artifacts/
