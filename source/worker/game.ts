@@ -15,7 +15,7 @@ export async function POST(req:Request){
  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const code=Array.from(crypto.getRandomValues(new Uint8Array(6)),n=>chars[n%chars.length]).join('');
  const {room,token}=createRoom(code,name,b.practice===true);
  const res=await db.prepare('INSERT OR IGNORE INTO rooms (code,state,revision,expires) VALUES (?,?,0,?)').bind(code,JSON.stringify(room),Date.now()+86400000).run();
- if(res.meta.changes)return Response.json({token,game:view(room,token)},{headers});
+ if(res.meta.changes)return Response.json({token,game:{...view(room,token),revision:0}},{headers});
  }throw Error('Could not create a room. Try again.');
  }
  const code=typeof b.code==='string'?b.code.toUpperCase():'';if(!/^[A-Z2-9]{6}$/.test(code))throw Error('Enter the six-character room code.');
@@ -24,11 +24,16 @@ export async function POST(req:Request){
  if(!row||row.expires<Date.now())throw Error('Room not found or expired. Rooms last 24 hours.');
  const room:Room=JSON.parse(row.state);let token=typeof b.token==='string'?b.token:'';
  if(b.action==='join'){if(!name)throw Error('Enter your callsign.');token=joinRoom(room,name)}
- else if(b.action==='read')return Response.json({game:view(room,token)},{headers});
+ else if(b.action==='read'){
+ const previousStatus=room.status;const game=view(room,token);
+ if(previousStatus===room.status)return Response.json({game:{...game,revision:row.revision}},{headers});
+ // A read can expire a running mission. Persist that outcome through the same
+ // compare-and-swap path as player actions, retrying if another player updated it.
+ }
  else transition(room,token,b);
  const result=await db.prepare('UPDATE rooms SET state=?,revision=revision+1 WHERE code=? AND revision=?').bind(JSON.stringify(room),code,row.revision).run();
  if(result.meta.changes&&b.action==='leave')return Response.json({left:true},{headers});
- if(result.meta.changes)return Response.json({game:view(room,token),...(b.action==='join'?{token}:{})},{headers});
+ if(result.meta.changes)return Response.json({game:{...view(room,token),revision:row.revision+1},...(b.action==='join'?{token}:{})},{headers});
  }return Response.json({error:'The crew updated the mission. Please try that action again.'},{status:409,headers});
  }catch(e){const msg=e instanceof Error?e.message:'Unable to contact the station.';const storage=/D1|SQLITE|storage|database/i.test(msg);if(storage)console.error(e);return Response.json({error:storage?'The station is temporarily unavailable. Please try again.':msg},{status:storage?503:400,headers})}
 }

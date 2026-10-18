@@ -9,19 +9,42 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 const roleNames=['Comms','Navigation','Systems','Security'];
 const icons=[Radio,Compass,Zap,ShieldCheck];
 const phaseNames=['Authenticate','Restore','Transmit'];
-type Session={code:string;token:string};
+import { GameRequestError, readSavedSession, shouldApplySnapshot, type Session, type SnapshotOrder } from '@/lib/game/client';
 function Waveform({active=false}:{active?:boolean}){return <div className={'waveform '+(active?'active':'')} aria-hidden="true"><div className="wave-line"/>{Array.from({length:69},(_,i)=><i key={i} style={{height:`${8+Math.abs(Math.sin(i*.53)*Math.cos(i*.17))*95}%`,animationDelay:`${i*.03}s`}}/>)}</div>}
 function clock(n:number){return `${Math.floor(Math.max(0,n)/60).toString().padStart(2,'0')}:${Math.floor(Math.max(0,n)%60).toString().padStart(2,'0')}`}
 export default function Home(){
  const [game,setGame]=useState<any>(null),[session,setSession]=useState<Session|null>(null),[name,setName]=useState(''),[code,setCode]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[offline,setOffline]=useState(false),[now,setNow]=useState(Date.now()),[offset,setOffset]=useState(0),[sound,setSound]=useState(false),[help,setHelp]=useState(false),[station,setStation]=useState('0'),[choices,setChoices]=useState<Record<string,string>>({}),[restoring,setRestoring]=useState(true);
- const current=useRef<Session|null>(null),requestId=useRef(0),lastApplied=useRef(0),audio=useRef<AudioContext|null>(null),previousPhase=useRef(-1);
- const accept=(d:any,id:number)=>{if(id<lastApplied.current)return;lastApplied.current=id;if(d.game){setGame(d.game);setOffset(d.game.serverNow-Date.now());setOffline(false)}};
- async function call(action:string,extra:any={},s:Session|null=current.current){const id=++requestId.current;const res=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...s,action,...extra}),signal:AbortSignal.timeout(12000)});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not reach the station.');if(s&&s!==current.current)return d;accept(d,id);return d}
+ const current=useRef<Session|null>(null),requestId=useRef(0),lastApplied=useRef<SnapshotOrder|null>(null),audio=useRef<AudioContext|null>(null),previousPhase=useRef(-1);
+ const accept=(d:any,id:number)=>{if(!d.game)return;const order={code:d.game.code,revision:d.game.revision,requestId:id};if(!shouldApplySnapshot(lastApplied.current,order))return;lastApplied.current=order;setGame(d.game);setOffset(d.game.serverNow-Date.now());setOffline(false);setRestoring(false)};
+ async function call(action:string,extra:any={},s:Session|null=current.current){const id=++requestId.current;const res=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...s,action,...extra}),signal:AbortSignal.timeout(12000)});const d:any=await res.json();if(!res.ok)throw new GameRequestError(d.error||'Could not reach the station.',res.status);if(s&&s!==current.current)return d;accept(d,id);return d}
  async function act(action:string,extra:any={}){setBusy(true);setError('');try{await call(action,extra)}catch(e){setError(e instanceof Error?e.message:'Connection interrupted. Please try again.')}finally{setBusy(false)}}
  async function enter(mode:string){if(!name.trim()){setError('Choose a callsign before joining the crew.');return}setBusy(true);setError('');try{const d=await call(mode==='join'?'join':'create',{name,code:code.trim().toUpperCase(),practice:mode==='practice'},null);const s={code:d.game.code,token:d.token};current.current=s;setSession(s);sessionStorage.setItem('signal-session',JSON.stringify(s));localStorage.setItem('signal-callsign',name)}catch(e){setError(e instanceof Error?e.message:'Could not create a room.')}finally{setBusy(false)}}
- useEffect(()=>{setName(localStorage.getItem('signal-callsign')||'');setCode(new URLSearchParams(location.search).get('room')||'');const raw=sessionStorage.getItem('signal-session');if(raw){try{const s=JSON.parse(raw);current.current=s;call('read',{},s).then(()=>setSession(s)).catch(()=>{current.current=null;sessionStorage.removeItem('signal-session')}).finally(()=>setRestoring(false))}catch{setRestoring(false)}}else setRestoring(false)},[]);
+ useEffect(()=>{
+  setName(localStorage.getItem('signal-callsign')||'');
+  setCode(new URLSearchParams(location.search).get('room')||'');
+  const saved=readSavedSession(sessionStorage.getItem('signal-session'));
+  if(saved){current.current=saved;setSession(saved)}
+  else{sessionStorage.removeItem('signal-session');setRestoring(false)}
+ },[]);
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),500);return()=>clearInterval(t)},[]);
- useEffect(()=>{if(!session)return;let stopped=false;let timer:ReturnType<typeof setTimeout>;let beat=0;async function poll(){try{await call(Date.now()-beat>20000?'heartbeat':'read');if(Date.now()-beat>20000)beat=Date.now()}catch{if(!stopped)setOffline(true)}if(!stopped)timer=setTimeout(poll,1500)}poll();return()=>{stopped=true;clearTimeout(timer)}},[session]);
+ useEffect(()=>{
+  if(!session)return;
+  let stopped=false;let timer:ReturnType<typeof setTimeout>;let beat=0;
+  async function poll(){
+   const heartbeat=Date.now()-beat>20000;
+   try{await call(heartbeat?'heartbeat':'read',{},session);if(heartbeat)beat=Date.now()}
+   catch(e){
+    if(stopped||current.current!==session)return;
+    if(e instanceof GameRequestError&&e.status===400){
+     current.current=null;setSession(null);setGame(null);lastApplied.current=null;
+     sessionStorage.removeItem('signal-session');setRestoring(false);setOffline(false);setError(e.message);return;
+    }
+    setOffline(true);
+   }
+   if(!stopped)timer=setTimeout(poll,1500);
+  }
+  poll();return()=>{stopped=true;clearTimeout(timer)};
+ },[session]);
  useEffect(()=>{if(!game)return;setChoices({});setStation(String(game.stations[0]?.role??0));if(previousPhase.current>=0&&game.phase>previousPhase.current&&sound){try{const ctx=audio.current||new AudioContext();audio.current=ctx;const osc=ctx.createOscillator(),gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.setValueAtTime(660,ctx.currentTime);osc.frequency.setValueAtTime(880,ctx.currentTime+.14);gain.gain.setValueAtTime(.06,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);osc.start();osc.stop(ctx.currentTime+.4)}catch{}}previousPhase.current=game.phase},[game?.phase,game?.round,game?.status]);
  useEffect(()=>{const ctx=(document as any).modelContext;if(!ctx?.registerTool)return;const controller=new AbortController();Promise.resolve(ctx.registerTool({name:'read_signal_lost_mission',description:'Read your current mission status and assigned private station clues. Does not reveal other players’ clues.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute:async(input:any)=>{if(!input||Object.keys(input).length)throw Error('No parameters expected.');if(!current.current)return {status:'not_in_room'};const d=await call('read');return d.game}},{signal:controller.signal})).catch(()=>{});return()=>controller.abort()},[]);
  async function copyInvite(){try{await navigator.clipboard.writeText(`${location.origin}/?room=${game.code}`);setNotice('Invite link copied.');setTimeout(()=>setNotice(''),3000)}catch{setNotice(`Share this room code: ${game.code}`)}}

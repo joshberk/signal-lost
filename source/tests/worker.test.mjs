@@ -11,7 +11,7 @@ const mf=new Miniflare({modules,modulesRoot:resolve('dist/server'),compatibility
 try{
 const db=await mf.getD1Database('DB');await db.exec((await readFile('drizzle/0000_blushing_mercury.sql','utf8')).replaceAll('\n',' '));
 async function call(action,s={},extra={},expected=200){const response=await mf.dispatchFetch('http://signal.test/api/game',{method:'POST',headers:{'content-type':'application/json',origin:'http://signal.test'},body:JSON.stringify({...s,...extra,action})});const d=await response.json();assert.equal(response.status,expected,JSON.stringify(d));return d}
-const created=await call('create',{}, {name:'Captain'});const code=created.game.code;const players=[{code,token:created.token}];
+const created=await call('create',{}, {name:'Captain'});assert.equal(created.game.revision,0);const code=created.game.code;const players=[{code,token:created.token}];
 for(let i=1;i<4;i++){const d=await call('join',{code},{name:'Crew '+i});players.push({code,token:d.token})}
 await call('read',{code,token:'invalid'}, {},400);
 for(const p of players)await call('ready',p);
@@ -49,8 +49,11 @@ const wrong=(await call('read',a)).game;assert.equal(wrong.phase,0);assert.equal
 await call('lock',a,{role:0,phase:0,round:av.round,value:values[0]},400);
 await call('leave',b,{},400);await call('claim',b,{},400);
 await editRoom(a.code,r=>{r.players[0].seen=Date.now()-61000});await call('claim',b);assert.equal((await call('read',b)).game.host,second.game.me);
-await editRoom(a.code,r=>{r.deadline=Date.now()-1});assert.equal((await call('read',a)).game.status,'lost');
-await call('heartbeat',b);const saved=await db.prepare('SELECT state FROM rooms WHERE code=?').bind(a.code).first();assert.equal(JSON.parse(saved.state).status,'lost');
+await editRoom(a.code,r=>{r.deadline=Date.now()-1});
+const beforeExpiry=await db.prepare('SELECT revision FROM rooms WHERE code=?').bind(a.code).first();
+const expired=(await call('read',a)).game;assert.equal(expired.status,'lost');assert.equal(expired.revision,beforeExpiry.revision+1);
+const saved=await db.prepare('SELECT state,revision FROM rooms WHERE code=?').bind(a.code).first();assert.equal(JSON.parse(saved.state).status,'lost');assert.equal(saved.revision,expired.revision);
+assert.equal((await call('read',b)).game.revision,expired.revision);
 await call('rematch',b);await call('leave',a);assert.equal((await call('read',b)).game.players.length,1);
 await db.prepare('UPDATE rooms SET expires=? WHERE code=?').bind(Date.now()-1,a.code).run();await call('read',b,{},400);
 const practice=await call('create',{}, {name:'Practice',practice:true});const p={code:practice.game.code,token:practice.token};await call('ready',p);await call('start',p);assert.equal((await call('read',p)).game.stations.length,4);

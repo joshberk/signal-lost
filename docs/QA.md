@@ -1,5 +1,14 @@
 # Migration QA — October 7, 2026
 
+## Reliability follow-up — October 18, 2026
+
+- Fixed refresh recovery so transient network/server errors retain the saved session and retry; only a definitive invalid/expired session response clears it. Malformed stored session values return to crew access safely.
+- API responses now include the authoritative D1 revision. The client rejects older revisions even if those requests were issued later, preventing overlapping polling/action responses from undoing displayed commitments.
+- A read that observes the mission deadline now persists the lost outcome using compare-and-swap. Tests verify the saved state and revision immediately after the read, without requiring a heartbeat.
+- TypeScript, production build, 12 mission engine scenarios, new client ordering/session regressions, and expanded built-Worker/real-local-D1 integration tests passed. Frozen lockfile installation passed.
+- These follow-up reconnect changes have not been verified under browser network fault injection. Physical-device checks below remain outstanding.
+- Cloudflare CLI still reports unauthenticated; production database provisioning and public deployment remain pending login.
+
 ## Completed
 
 - TypeScript check passed.

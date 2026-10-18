@@ -21,7 +21,7 @@
     "deploy": "pnpm build && wrangler d1 migrations apply DB --remote && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "test": "node --experimental-strip-types tests/game.test.mjs && node tests/worker.test.mjs",
+    "test": "node --experimental-strip-types tests/game.test.mjs && node --experimental-strip-types tests/client.test.mjs && node tests/worker.test.mjs",
     "start": "wrangler dev --ip 127.0.0.1 --port 8787",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && wrangler deploy --dry-run --outdir dist/server",
