@@ -6,6 +6,7 @@
 - API responses now include the authoritative D1 revision. The client rejects older revisions even if those requests were issued later, preventing overlapping polling/action responses from undoing displayed commitments.
 - A read that observes the mission deadline now persists the lost outcome using compare-and-swap. Tests verify the saved state and revision immediately after the read, without requiring a heartbeat.
 - TypeScript, production build, 12 mission engine scenarios, new client ordering/session regressions, and expanded built-Worker/real-local-D1 integration tests passed. Frozen lockfile installation passed.
+- Repeated the frozen-lockfile installation (offline, using the downloaded package cache), type check, production build and all three test suites from a fresh local Git clone with no copied dependencies or runtime state; all passed.
 - These follow-up reconnect changes have not been verified under browser network fault injection. Physical-device checks below remain outstanding.
 - Cloudflare CLI still reports unauthenticated; production database provisioning and public deployment remain pending login.
 
@@ -24,7 +25,7 @@
 
 ## Pending / limits
 
-- Clean-checkout verification is recorded below after completion.
+- Clean-checkout verification completed in the October 18 follow-up above.
 - Remote deployment/public signed-out verification pending account access; no public game URL yet.
 - Physical devices, unfamiliar-player difficulty testing and true network-disconnection recovery are not tested.
 - Phone viewport override was requested, but the browser continued reporting 1280×720. Narrow phone layout is **not verified**; no mobile screenshot is claimed.
