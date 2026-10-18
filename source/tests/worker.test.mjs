@@ -9,7 +9,7 @@ const files=await readdir('dist/server',{recursive:true});
 const modules=['index.js',...files.filter(f=>f.endsWith('.js')&&f!=='index.js')].map(f=>({type:'ESModule',path:resolve('dist/server',f)}));
 const mf=new Miniflare({modules,modulesRoot:resolve('dist/server'),compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],serviceBindings:{ASSETS:()=>new Response('Not found',{status:404})}});
 try{
-const db=await mf.getD1Database('DB');await db.exec((await readFile('drizzle/0000_blushing_mercury.sql','utf8')).replaceAll('\n',' '));
+const db=await mf.getD1Database('DB');for(const f of (await readdir('drizzle')).filter(f=>f.endsWith('.sql')).sort())await db.exec((await readFile('drizzle/'+f,'utf8')).replaceAll('\n',' '));
 async function call(action,s={},extra={},expected=200){const response=await mf.dispatchFetch('http://signal.test/api/game',{method:'POST',headers:{'content-type':'application/json',origin:'http://signal.test'},body:JSON.stringify({...s,...extra,action})});const d=await response.json();assert.equal(response.status,expected,JSON.stringify(d));return d}
 const created=await call('create',{}, {name:'Captain'});assert.equal(created.game.revision,0);const code=created.game.code;const players=[{code,token:created.token}];
 for(let i=1;i<4;i++){const d=await call('join',{code},{name:'Crew '+i});players.push({code,token:d.token})}
@@ -57,6 +57,10 @@ assert.equal((await call('read',b)).game.revision,expired.revision);
 await call('rematch',b);await call('leave',a);assert.equal((await call('read',b)).game.players.length,1);
 await db.prepare('UPDATE rooms SET expires=? WHERE code=?').bind(Date.now()-1,a.code).run();await call('read',b,{},400);
 const practice=await call('create',{}, {name:'Practice',practice:true});const p={code:practice.game.code,token:practice.token};await call('ready',p);await call('start',p);assert.equal((await call('read',p)).game.stations.length,4);
+const kickCreated=await call('create',{}, {name:'Kick Captain'});const kickHost={code:kickCreated.game.code,token:kickCreated.token};const kickJoined=await call('join',{code:kickHost.code},{name:'Kick Sybil'});await call('kick',kickHost,{player:kickJoined.game.me});assert.equal((await call('read',kickHost)).game.players.length,1);await call('read',{code:kickHost.code,token:kickJoined.token},{},400);
+const genericMissing=await call('join',{code:'ZZZZZZ'},{name:'Probe'},400);assert.match(genericMissing.error,/Could not join that room/);const genericPractice=await call('join',{code:practice.game.code},{name:'Probe'},400);assert.equal(genericPractice.error,genericMissing.error);
+let sawLimit=false;for(let i=0;i<15&&!sawLimit;i++){const res=await mf.dispatchFetch('http://signal.test/api/game',{method:'POST',headers:{'content-type':'application/json',origin:'http://signal.test'},body:JSON.stringify({action:'create',name:'Flood '+i})});if(res.status===429)sawLimit=true;else assert.equal(res.status,200)}assert.equal(sawLimit,true);
+console.log('Security API checks passed: captain kick revokes the kicked session, join errors are generic, and room creation is rate limited.');
 const assets=await readdir('dist/client/assets');for(const f of assets.filter(f=>f.endsWith('.js'))){const js=await readFile('dist/client/assets/'+f,'utf8');assert(!js.includes('Server-owned, curated scenarios'));assert(!js.includes('Primary reading:'));assert(!js.includes('Both obstructed bays'));}
 console.log('Built Worker + real local D1 integration passed: four sessions, all three mechanics, simultaneous commits, permissions, persistence, rematch, leave and replacement.');
 console.log('Additional API checks passed: two-player roles, wrong-answer penalty, stale/unauthorized actions, captain takeover, timeout persistence, solo practice, invalid/full/expired rooms, origin/method/body guards and browser bundle isolation.');

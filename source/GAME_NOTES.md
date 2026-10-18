@@ -12,6 +12,8 @@ Playable contest prototype for Joshua Berkoh. Built with ChatGPT Work.
 - Shared decision replay, free hints, optional confirmation tones, reduced motion.
 - Room state expires from use after 24 hours. Leaving a lobby or completed mission releases the seat and transfers captaincy when needed.
 - Players communicate in person or through their own voice call; no built-in voice chat.
+- The captain can remove a crewmate from the lobby or during a mission (locks clear and stations are reassigned). Joins no longer reset ready state, and callsigns must be unique in a room.
+- Room creation, joins, and lock/unlock actions are rate-limited per client in D1; join failures share one generic message, and a scheduled cleanup deletes expired rooms.
 
 ## Verification
 Run `node --experimental-strip-types tests/game.test.mjs`.

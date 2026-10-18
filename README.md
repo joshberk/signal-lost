@@ -42,7 +42,7 @@ Set the new database's ID as the Actions **variable** `CLOUDFLARE_D1_DATABASE_ID
 
 Add numbered SQL migrations under `source/drizzle/` (retain applied migrations). Test with `pnpm db:migrate:local`, run typecheck/build/test, then commit and push to main. Actions applies pending migrations before publishing. `pnpm db:migrate:remote` applies only migrations; `pnpm deploy` performs the full manual release. Back up production data and assess compatibility before destructive schema changes.
 
-The included initial migration creates `rooms(code, state, revision, expires)`. No original live rooms are included. The previous unused Drizzle generator was removed; migrations use standard Wrangler SQL files.
+The included migrations create `rooms(code, state, revision, expires)` and `rate_limits(bucket, count, reset_at)`. No original live rooms are included. The previous unused Drizzle generator was removed; migrations use standard Wrangler SQL files.
 
 ## Migration and verification
 
@@ -54,4 +54,4 @@ Official references checked for the migration: [Worker static asset routing](htt
 
 ## Prototype limits
 
-Polling every 1.5 seconds; same-tab sessionStorage reconnect; no built-in voice chat or cross-device identity recovery. Active missions disallow leaving; disconnected stations require their owners to reconnect. Captain takeover is available after 60 seconds disconnected. Rooms are inaccessible after 24 hours, but rows are not automatically deleted. The public API has no application-level rate limiting; monitor usage and add appropriate abuse protection before substantial public traffic. Physical-device and real-player difficulty testing remain required.
+Polling every 1.5 seconds; same-tab sessionStorage reconnect; no built-in voice chat or cross-device identity recovery. Active missions disallow leaving, but the captain can remove a crewmate at any time; disconnected stations require their owners to reconnect. Captain takeover is available after 60 seconds disconnected. Rooms are inaccessible after 24 hours and expired rows are deleted by a scheduled Worker cleanup every six hours. The API rate-limits room creation, joins, and station lock/unlock actions per client, and join failures return one generic message; still add Cloudflare edge rate limiting before substantial public traffic, since application limits are per-IP and cannot stop a distributed flood. Physical-device and real-player difficulty testing remain required.
