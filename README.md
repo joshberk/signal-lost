@@ -34,7 +34,9 @@ The checked-in placeholder supports local D1 only. Remote deployment is incomple
 
 Target: https://github.com/joshberk/signal-lost. Keep its existing visibility. `.github/workflows/deploy.yml` installs from the frozen lockfile, type-checks, builds and tests every PR, then migrates/deploys pushes to `main` and manual runs on `main`.
 
-In the repository's Actions secrets, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Scope the token to the intended account with Workers Scripts edit and D1 edit permissions, plus account access required by Wrangler. Enter secrets directly in GitHub, never in code, commits or chat. PR verification does not receive deployment secrets. The workflow needs the real D1 ID committed before deployment.
+In the repository's Actions secrets, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Scope the token to the intended account with Workers Scripts edit and D1 edit permissions, plus account access required by Wrangler. Enter secrets directly in GitHub, never in code, commits or chat. PR verification does not receive deployment secrets.
+
+Set the new database's ID as the Actions **variable** `CLOUDFLARE_D1_DATABASE_ID`, or commit its real ID in `source/wrangler.jsonc`. A deployment preflight reports every missing setting before migration starts. It generates an ignored `source/wrangler.deploy.json` with the chosen DB ID; credentials remain in the environment. For manual deployment, `pnpm deploy` uses the same preflight/configuration and supports Wrangler login. CI requires the token/account secrets even if you are logged in locally. Deployments on the same branch run serially to avoid overlapping migrations.
 
 ## Future migrations and releases
 

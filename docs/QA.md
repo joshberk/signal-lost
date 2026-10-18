@@ -2,6 +2,8 @@
 
 ## Reliability follow-up — October 18, 2026
 
+Deployment diagnosis: GitHub run `39158083207` passed installation, typecheck, production build and all tests on Ubuntu. The remote migration failed because both Cloudflare Actions secrets were empty; no repository Actions secrets were configured. The D1 ID was also still the local placeholder. Added an aggregate deployment preflight, optional D1 ID from Actions variables, ignored generated deploy config and serialized workflow runs. Cloudflare account setup remains required; these changes do not claim a successful public deployment.
+
 - Fixed refresh recovery so transient network/server errors retain the saved session and retry; only a definitive invalid/expired session response clears it. Malformed stored session values return to crew access safely.
 - API responses now include the authoritative D1 revision. The client rejects older revisions even if those requests were issued later, preventing overlapping polling/action responses from undoing displayed commitments.
 - A read that observes the mission deadline now persists the lost outcome using compare-and-swap. Tests verify the saved state and revision immediately after the read, without requiring a heartbeat.
