@@ -42,7 +42,7 @@ Set the new database's ID as the Actions **variable** `CLOUDFLARE_D1_DATABASE_ID
 
 Add numbered SQL migrations under `source/drizzle/` (retain applied migrations). Test with `pnpm db:migrate:local`, run typecheck/build/test, then commit and push to main. Actions applies pending migrations before publishing. `pnpm db:migrate:remote` applies only migrations; `pnpm deploy` performs the full manual release. Back up production data and assess compatibility before destructive schema changes.
 
-The included initial migration creates `rooms(code, state, revision, expires)`. No original live rooms are included. The previous unused Drizzle generator was removed; migrations use standard Wrangler SQL files.
+The included migrations create `rooms(code, state, revision, expires)` and `rate_limits(bucket, count, reset_at)`. No original live rooms are included. The previous unused Drizzle generator was removed; migrations use standard Wrangler SQL files.
 
 ## Migration and verification
 
@@ -54,4 +54,6 @@ Official references checked for the migration: [Worker static asset routing](htt
 
 ## Prototype limits
 
-Polling every 1.5 seconds; same-tab sessionStorage reconnect; no built-in voice chat or cross-device identity recovery. Active missions disallow leaving; disconnected stations require their owners to reconnect. Captain takeover is available after 60 seconds disconnected. Rooms are inaccessible after 24 hours, but rows are not automatically deleted. The public API has no application-level rate limiting; monitor usage and add appropriate abuse protection before substantial public traffic. Physical-device and real-player difficulty testing remain required.
+Polling every 1.5 seconds; same-tab sessionStorage reconnect; no built-in voice chat or cross-device identity recovery. Active missions disallow leaving, but the captain can remove a crewmate at any time. Removal pauses all new joins, including after rematches; existing crew keep their sessions. From the lobby, the captain can explicitly confirm **Reopen joining**, which permits anyone with the code (including a previously removed person) to join again. Without player accounts, this is an admission boundary, not a permanent identity ban. Captain takeover is available after 60 seconds disconnected. Rooms are inaccessible after 24 hours and expired rows are deleted by scheduled cleanup every six hours.
+
+Rate-limit admission is an atomic D1 upsert. Room creation permits 10 attempts per 10 minutes, joins 30 per 10 minutes, and invalid session requests 60 per minute. These anonymous allowances use 1,024 fixed IP-hash slots per scope, bounding counter storage to 3,072 public buckets; collisions can share an anonymous allowance. Invalid codes/tokens never become bucket keys. Authenticated lock/unlock uses 120 attempts per minute **per room/player**, after session validation, and bypasses the anonymous abuse quota so an abusive Wi-Fi peer cannot consume another player's gameplay quota. Invalid session paths share one generic error, including reads and heartbeats. Limits do not replace Cloudflare edge protection or stop distributed floods/read amplification. Physical-device and real-player difficulty testing remain required.
