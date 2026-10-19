@@ -12,7 +12,7 @@ Playable contest prototype for Joshua Berkoh. Built with ChatGPT Work.
 - Shared decision replay, free hints, optional confirmation tones, reduced motion.
 - Room state expires from use after 24 hours. Leaving a lobby or completed mission releases the seat and transfers captaincy when needed.
 - Players communicate in person or through their own voice call; no built-in voice chat.
-- The captain can remove a crewmate from the lobby or during a mission (locks clear and stations are reassigned). Joins no longer reset ready state, and callsigns must be unique in a room.
+- The captain can remove a crewmate from the lobby or during a mission (locks clear and stations are reassigned; multiplayer missions abort to lost if fewer than 2 players remain). Joins no longer reset ready state, and callsigns must be unique, normalized, and alphanumeric.
 - Room creation, joins and invalid sessions use bounded IP-hash allowances. Lock/unlock limits belong to an authenticated room/player, so Wi-Fi peers have independent gameplay quotas. Admission/count/reset is one atomic D1 operation; invalid sessions never create gameplay buckets and receive uniform errors.
 - A captain kick pauses new joins, persisting across rematches. Existing crew can reconnect. Only the captain can deliberately reopen admission from the lobby, with a confirmation warning that anyone with the room code can return. This does not implement permanent bans without player identity.
 

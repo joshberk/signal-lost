@@ -15,7 +15,7 @@ type Player={id:string;token:string;name:string;ready:boolean;seen:number};
 type Event={at:number;text:string;kind:string};
 export type Room={admissionOpen?:boolean;settings?:number[][];code:string;players:Player[];host:string;practice:boolean;status:string;phase:number;variant:number;deadline:number;started:number;finished:number;attempts:number;round:number;locked:Record<string,string>;events:Event[];hinted:number[]};
 function event(r:Room,text:string,kind='info'){r.events.push({at:Date.now(),text,kind});r.events=r.events.slice(-120)}
-function removePlayer(r:Room,target:Player,reason:string){r.players=r.players.filter(x=>x.id!==target.id);if(r.host===target.id)r.host=r.players[0]?.id||'';if(r.status==='playing'){r.locked={};r.round++}event(r,`${target.name} ${reason}`)}
+function removePlayer(r:Room,target:Player,reason:string){r.players=r.players.filter(x=>x.id!==target.id);if(r.host===target.id)r.host=r.players[0]?.id||'';if(r.status==='playing'){r.locked={};r.round++;if(!r.practice&&r.players.length<2){r.status='lost';r.finished=Date.now();event(r,'Multiplayer mission ended: rescue requires at least two crew members.','failure')}}event(r,`${target.name} ${reason}`)}
 export function createRoom(code:string,name:string,practice=false):{room:Room;token:string}{
  const token=crypto.randomUUID();const id=crypto.randomUUID();return {token,room:{settings:newGrid(),code,players:[{id,token,name,ready:false,seen:Date.now()}],host:id,practice,status:'lobby',phase:0,variant:crypto.getRandomValues(new Uint8Array(1))[0]%3,deadline:0,started:0,finished:0,attempts:0,round:0,locked:{},events:[],hinted:[]}};
 }
@@ -49,7 +49,7 @@ export function transition(r:Room,token:string,body:any){
  default:throw Error('Unknown action.');
  }return r;
 }
-export function joinRoom(r:Room,name:string){if(r.admissionOpen===false)throw Error('The captain has paused new joins.');if(r.practice)throw Error('This room is for solo practice. Create a crew room instead.');if(r.status!=='lobby')throw Error('That mission has started. Ask the crew to finish and rematch.');if(r.players.length>=4)throw Error('This room is full.');if(r.players.some(x=>x.name.toLowerCase()===name.toLowerCase()))throw Error('That callsign is already in use. Pick another.');const token=crypto.randomUUID();r.players.push({id:crypto.randomUUID(),token,name,ready:false,seen:Date.now()});if(!r.host)r.host=r.players[r.players.length-1].id;return token}
+export function joinRoom(r:Room,name:string){if(r.admissionOpen===false)throw Error('The captain has paused new joins.');if(r.practice)throw Error('This room is for solo practice. Create a crew room instead.');if(r.status!=='lobby')throw Error('That mission has started. Ask the crew to finish and rematch.');if(r.players.length>=4)throw Error('This room is full.');if(r.players.some(x=>x.name.normalize('NFKC').toLowerCase()===name.normalize('NFKC').toLowerCase()))throw Error('That callsign is already in use. Pick another.');const token=crypto.randomUUID();r.players.push({id:crypto.randomUUID(),token,name,ready:false,seen:Date.now()});if(!r.host)r.host=r.players[r.players.length-1].id;return token}
 export function stationReference(r:Room,role:number){
  if(!r.settings||r.phase===0)return null;
  if(r.phase===1){const values=[[10,20,30],[45,135,270],[10,20,30],[1,2,3]][role];return {title:'Calibration card',lines:values.map((v,i)=>`${v} units = ${PHASES[1].options[role][i]}`)}}

@@ -1,5 +1,12 @@
 # Migration QA — October 7, 2026
 
+## Defensive security hardening follow-up — October 19, 2026
+
+- **Multiplayer Quorum Invariant (SEC-05):** In a 2-player multiplayer mission, removing or kicking a player now immediately transitions room status to `lost`, recorded with a failure event. This prevents the remaining single player from receiving all 4 station consoles, bypassing the cooperative multiplayer requirement, or single-handedly solving the game.
+- **Callsign Normalization & Character Allowlist (SEC-07):** Added Unicode NFKC normalization and restricted callsigns to `/^[A-Za-z0-9 _-]{1,18}$/`. Prevents visual spoofing via Unicode homoglyphs (e.g. Cyrillic/Latin letter mixing), zero-width characters, and bidirectional overrides.
+- **D1 Cleanup Indexes (SEC-06):** Added migration `0002_add_cleanup_indexes.sql` creating indexes on `rooms(expires)` and `rate_limits(reset_at)`. Prevents sequential full table scans during periodic 6-hour cron cleanups.
+- **Regression Verification:** Added integration tests in `source/tests/security.test.mjs` verifying homoglyph rejection and multiplayer quorum enforcement upon mid-mission kick. All 10 security test scenarios and all engine/client/deployment suites passed.
+
 ## PR #1 security follow-up — October 18, 2026
 
 Reviewed immutable PR head `431e4ba633e8714450df00572259a1605dac6ab8` against base `2305d70`. The baseline built-Worker/real-local-D1 tests reproduced invalid-session gameplay bucket writes, shared-Wi-Fi quota denial, distinguishable room/session errors, and immediate rejoining after a kick. The undelayed baseline quota concurrency test happened to serialize; the quota race was established by the separate SELECT/check/write source path rather than a claimed production reproduction.

@@ -97,4 +97,22 @@ await test('kick races preserve revoked-token and admission boundaries under D1 
   if(duringPlay)assert.deepEqual(final.locked,[]);
  }
 });
+await test('callsigns require safe alphanumeric characters and prevent homoglyphs',async()=>{
+ await clear();
+ assert.equal((await request({action:'create',name:'<script>alert(1)</script>'})).status,400);
+ assert.equal((await request({action:'create',name:'   '})).status,400);
+ const cap=await ok({action:'create',name:'Sparrow'});
+ const joinHomoglyph=await request({action:'join',code:cap.game.code,name:'Sp\u0430rrow'});
+ assert.equal(joinHomoglyph.status,400);
+});
+await test('kicking a player during a 2-player multiplayer mission aborts to lost and preserves quorum',async()=>{
+ await clear();const {a,b,bId}=await pair();
+ await ok({action:'ready',...a});await ok({action:'ready',...b});await ok({action:'start',...a});
+ await ok({action:'kick',...a,player:bId});
+ const final=(await ok({action:'read',...a})).game;
+ assert.equal(final.status,'lost');
+ assert.equal(final.players.length,1);
+ assert.equal(final.admissionOpen,false);
+ assert.equal(final.events.at(-2).kind,'failure');
+});
 }finally{await mf.dispose();}
