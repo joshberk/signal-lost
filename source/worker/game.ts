@@ -16,7 +16,8 @@ export async function POST(req:Request){
  const text=await req.text();if(text.length>2048)return Response.json({error:'Request too large.'},{status:413,headers});
  let b;try{b=JSON.parse(text)}catch{return Response.json({error:'Invalid request.'},{status:400,headers})}
  if(!b||typeof b!=='object')throw Error('Invalid request.');const db=database();
- const name=typeof b.name==='string'?b.name.trim().slice(0,18):'';
+ const rawName=typeof b.name==='string'?b.name.normalize('NFKC').trim().slice(0,18):'';
+ const name=/^[A-Za-z0-9 _-]{1,18}$/.test(rawName)?rawName:'';
  if(b.action==='create'){
  if(await limited(db,await publicKey('create',req),10,600000))return tooMany();
  if(!name)throw Error('Enter your callsign.');
