@@ -1,5 +1,24 @@
 # Migration QA — October 7, 2026
 
+## PR #1 security follow-up — October 18, 2026
+
+Reviewed immutable PR head `431e4ba633e8714450df00572259a1605dac6ab8` against base `2305d70`. The baseline built-Worker/real-local-D1 tests reproduced invalid-session gameplay bucket writes, shared-Wi-Fi quota denial, distinguishable room/session errors, and immediate rejoining after a kick. The undelayed baseline quota concurrency test happened to serialize; the quota race was established by the separate SELECT/check/write source path rather than a claimed production reproduction.
+
+Candidate changes: atomic D1 quota upsert; authenticated per-player gameplay quotas; bounded anonymous abuse slots; uniform invalid-session errors; captain-controlled admission paused by kick and retained through rematches.
+
+Validation completed locally: `pnpm typecheck`, `pnpm build`, and `pnpm test` passed. The full suite includes the existing 12 engine missions, client and deployment regressions, actual built Worker/local D1 gameplay tests, and eight new security integration scenarios:
+
+- Exact quota accounting under concurrent creation (new/near-limit/expired windows), join and lock/unlock requests.
+- Invalid lock/unlock requests with changing codes/tokens create no gameplay counters.
+- Anonymous storage stays bounded across 1,100 distinct source IPs.
+- Authenticated Wi-Fi peers have separate allowances, even after invalid-session abuse on the same IP.
+- Missing, expired, malformed-code and invalid-token read/heartbeat/lock/unlock/unknown-action responses are uniform, with consistent throttling.
+- Kick revokes the token, denies different-name/different-IP rejoin and retains closed admission after rematch.
+- Captain-only deliberate reopening and ordinary voluntary leave/replacement continue to work.
+- Concurrent kick/join and kick/lock preserve the final admission/token boundaries through room CAS retries. A join committed before the kick remains admitted; the admission closure takes effect at the kick's atomic commit.
+
+An independent read-only candidate review found no concrete remaining bypass in these four paths. No browser/physical-device test of the new admission confirmation or production attack was performed in this PR follow-up. No approval, merge or production deployment is part of this PR update.
+
 ## Reliability follow-up — October 18, 2026
 
 Deployment diagnosis: GitHub run `39158083207` passed installation, typecheck, production build and all tests on Ubuntu. The remote migration failed because both Cloudflare Actions secrets were empty; no repository Actions secrets were configured. The D1 ID was also still the local placeholder. Added an aggregate deployment preflight, optional D1 ID from Actions variables, ignored generated deploy config and serialized workflow runs. Cloudflare account setup remains required; these changes do not claim a successful public deployment.
